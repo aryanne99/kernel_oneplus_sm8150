@@ -383,8 +383,9 @@ int remote_rmi4_i2c_write(unsigned short addr, unsigned char *data, unsigned sho
 {
 	int retval;
 	unsigned char retry;
-   // unsigned char buf[length + 1];
-	unsigned char *buf = kzalloc((length + 1) * sizeof(char), GFP_KERNEL | GFP_DMA);
+	// unsigned char buf[length + 1];
+	unsigned char *buf =
+	    kzalloc(length + 1, GFP_KERNEL | GFP_DMA);
 	struct i2c_client *i2c_client = remote_rmi4_get_i2c_client();
 	struct i2c_msg msg[] = {
 		{
@@ -506,12 +507,12 @@ static ssize_t rmidev_read(struct file *filp, char __user *buf,
 	unsigned char *tmpbuf;
     struct rmidev_data *dev_data = filp->private_data;
 
-	tmpbuf = kzalloc((count + 1) * sizeof(char), GFP_KERNEL);
-    if (IS_ERR(dev_data)) {
-        pr_err("%s: Pointer of char device data is invalid", __func__);
-	kfree(tmpbuf);
-        return -EBADF;
-    }
+	tmpbuf = kzalloc(count + 1, GFP_KERNEL);
+	if (IS_ERR(dev_data)) {
+		pr_err("%s: Pointer of char device data is invalid", __func__);
+		kfree(tmpbuf);
+		return -EBADF;
+	}
 
     if (count == 0) {
 	kfree(tmpbuf);
@@ -560,9 +561,34 @@ static ssize_t rmidev_write(struct file *filp, const char __user *buf,
 	unsigned char *tmpbuf;
     struct rmidev_data *dev_data = filp->private_data;
 
-	tmpbuf = kzalloc((count + 1) * sizeof(char), GFP_KERNEL);
-    if (IS_ERR(dev_data)) {
-        pr_err("%s: Pointer of char device data is invalid", __func__);
+	tmpbuf = kzalloc(count + 1, GFP_KERNEL);
+	if (IS_ERR(dev_data)) {
+		pr_err("%s: Pointer of char device data is invalid", __func__);
+		kfree(tmpbuf);
+		return -EBADF;
+	}
+
+	if (count == 0) {
+		kfree(tmpbuf);
+		return 0;
+	}
+
+	if (count > (REG_ADDR_LIMIT - *f_pos))
+		count = REG_ADDR_LIMIT - *f_pos;
+
+	if (copy_from_user(tmpbuf, buf, count)) {
+		kfree(tmpbuf);
+		return -EFAULT;
+	}
+	mutex_lock(dev_data->pdata->pmutex);
+	mutex_lock(&(dev_data->file_mutex));
+
+	retval = remote_rmi4_i2c_write(*f_pos, tmpbuf, count);
+	if (retval >= 0)
+		*f_pos += retval;
+
+	mutex_unlock(&(dev_data->file_mutex));
+	mutex_unlock(dev_data->pdata->pmutex);
 	kfree(tmpbuf);
         return -EBADF;
     }
