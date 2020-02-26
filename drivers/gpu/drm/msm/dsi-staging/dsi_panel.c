@@ -973,9 +973,36 @@ int dsi_panel_op_set_hbm_mode(struct dsi_panel *panel, int level)
 
 	mutex_lock(&panel->panel_lock);
 
-	mode = panel->cur_mode;
-	if (panel->hbm_mode == 5) {
-        level = 1;
+    mode = panel->cur_mode;
+    if (panel->hbm_mode == 5) {
+      level = 1;
+    }
+
+    switch (level) {
+    case 0:
+        count = mode->priv_info->cmd_sets[DSI_CMD_SET_HBM_OFF].count;
+        if (!count) {
+            pr_err("This panel does not support HBM mode off.\n");
+            goto error;
+        } else {
+            rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_HBM_OFF);
+			printk(KERN_ERR"When HBM OFF -->hbm_backight = %d panel->bl_config.bl_level =%d\n",panel->hbm_backlight,panel->bl_config.bl_level);
+			rc= dsi_panel_update_backlight(panel,panel->hbm_backlight);
+        }
+    break;
+
+    case 1:
+        count = mode->priv_info->cmd_sets[DSI_CMD_SET_HBM_ON_5].count;
+        if (!count) {
+            pr_err("This panel does not support HBM mode.\n");
+            goto error;
+        } else {
+            rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_HBM_ON_5);
+        }
+    break;
+    default:
+    break;
+
     }
 	switch (level) {
 	case 0:
